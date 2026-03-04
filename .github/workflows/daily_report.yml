@@ -1,0 +1,30 @@
+name: Daily SG-REITs Automated Report
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # 매일 UTC 00:00 (싱가포르 시간 오전 8시)
+  workflow_dispatch:    # 필요할 때 수동으로 실행 버튼 클릭 가능
+
+jobs:
+  run-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance pandas numpy matplotlib fpdf
+
+      - name: Execute Main Pipeline
+        env:
+          # GitHub Secrets에 등록한 변수를 파이썬 os.environ으로 전달
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+        run: python main.py
