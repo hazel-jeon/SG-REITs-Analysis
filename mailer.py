@@ -1,27 +1,26 @@
 import smtplib
 import os
-import datetime
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
+from email.message import EmailMessage
 
-def send_analysis_email(pdf_filename):
-    sender_email = os.environ.get('EMAIL_USER')
-    sender_password = os.environ.get('EMAIL_PASS')
-    
-    msg = MIMEMultipart()
-    msg['Subject'] = f"Daily Report - {datetime.datetime.now().strftime('%Y-%m-%d')}"
-    msg.attach(MIMEText("Report attached.", 'plain'))
+def send_analysis_email(file_path):
+    # GitHub Secrets에서 이메일 주소와 비밀번호를 가져옴
+    email_user = os.environ.get('EMAIL_USER')
+    email_pass = os.environ.get('EMAIL_PASS')
 
-    with open(pdf_filename, "rb") as attachment:
-        part = MIMEBase('application', 'octet-stream')
-        part.set_payload(attachment.read())
-        encoders.encode_base64(part)
-        part.add_header('Content-Disposition', f"attachment; filename= {pdf_filename}")
-        msg.attach(part)
+    # 이메일 내용 구성
+    msg = EmailMessage()
+    msg['Subject'] = f"Daily SG-REITs Analysis Report ({os.date.today() if hasattr(os, 'date') else 'Today'})"
+    msg['From'] = email_user
+    msg['To'] = email_user  # <-- 이 부분이 비어있거나 잘못되면 에러가 납니다!
+    msg.set_content("Please find the attached daily REITs analysis report.")
 
-    with smtplib.SMTP('smtp.gmail.com', 587) as server:
-        server.starttls()
-        server.login(sender_email, sender_password)
+    # PDF 첨부
+    with open(file_path, 'rb') as f:
+        file_data = f.read()
+        msg.add_attachment(file_data, maintype='application', subtype='pdf', filename=file_path)
+
+    # 이메일 발송
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        server.login(email_user, email_pass)
         server.send_message(msg)
+    print("Email sent successfully!")
