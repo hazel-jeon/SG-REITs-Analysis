@@ -6,7 +6,9 @@ from mailer import send_analysis_email
 REITS_CONFIG = {
     "C38U.SI": "CapitaLand Integrated",
     "A17U.SI": "CapitaLand Ascendas",
-    "N2IU.SI": "Mapletree Pan Asia"
+    "N2IU.SI": "Mapletree Pan Asia",
+    "M44U.SI": "Mapletree Logistics",
+    "ME8U.SI": "Mapletree Industrial"
 }
 
 def run_pipeline():
