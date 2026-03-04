@@ -8,7 +8,7 @@ REITS_CONFIG = {
     "A17U.SI": "CapitaLand Ascendas",
     "N2IU.SI": "Mapletree Pan Asia",
     "M44U.SI": "Mapletree Logistics",
-    "ME8U.SI": "Mapletree Industrial"
+    "ME8U.SI": "Mapletree Industrial",
     "BUOU.SI": "Frasers Centrepoint Trust",
     "AJBU.SI": "Keppel DC REIT",
     "J69U.SI": "Frasers Logistics & Comm",
