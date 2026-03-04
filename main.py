@@ -9,6 +9,11 @@ REITS_CONFIG = {
     "N2IU.SI": "Mapletree Pan Asia",
     "M44U.SI": "Mapletree Logistics",
     "ME8U.SI": "Mapletree Industrial"
+    "BUOU.SI": "Frasers Centrepoint Trust",
+    "AJBU.SI": "Keppel DC REIT",
+    "J69U.SI": "Frasers Logistics & Comm",
+    "M1GU.SI": "Sabana Industrial REIT",
+    "HMN.SI": "OUE Hospitality Trust"
 }
 
 def run_pipeline():
