@@ -13,7 +13,12 @@ REITS_CONFIG = {
     "AJBU.SI": "Keppel DC REIT",
     "J69U.SI": "Frasers Logistics & Comm",
     "M1GU.SI": "Sabana Industrial REIT",
-    "HMN.SI": "OUE Hospitality Trust"
+    "HMN.SI": "OUE Hospitality Trust",
+    "C2PU.SI": "Parkway Life REIT",
+    "T82U.SI": "Suntec REIT",
+    "J91U.SI": "ESR-LOGOS REIT",
+    "TS0U.SI": "OUE REIT",
+    "CY6U.SI": "CapitaLand India Trust"
 }
 
 def run_pipeline():
