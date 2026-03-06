@@ -17,7 +17,7 @@ def get_reit_analysis(reits_info, benchmark="CLR.SI"):
             hist = stock.history(period="1y")['Close']
             ret = hist.pct_change()
             
-            # 🔥 데이터 정렬 (리츠와 벤치마크의 날짜를 맞춤)
+
             combined = pd.concat([ret, bench_ret], axis=1).dropna()
             combined.columns = ['reit', 'benchmark']
 
@@ -37,7 +37,7 @@ def get_reit_analysis(reits_info, benchmark="CLR.SI"):
             
             results.append({
                 "Ticker": ticker, 
-                "Name": name[:20], # 이름이 너무 길면 테이블이 깨지므로 제한
+                "Name": name[:20], # 이름 길이 제한
                 "Return(%)": round(cum_ret*100, 2),
                 "Vol(%)": round(vol*100, 2),
                 "Beta": round(beta, 2), 
