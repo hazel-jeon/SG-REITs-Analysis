@@ -9,14 +9,14 @@ REITS_CONFIG = {
     "ME8U.SI": "Mapletree Industrial",
     "BUOU.SI": "Frasers Centrepoint",
     "AJBU.SI": "Keppel DC REIT",
-    "J69U.SI": "Frasers Logistics & Comm",
-    "M1GU.SI": "Sabana Industrial REIT",
-    "HMN.SI":  "OUE Hospitality Trust",
+    "J69U.SI": "Frasers Logistics",
     "C2PU.SI": "Parkway Life REIT",
     "T82U.SI": "Suntec REIT",
-    "J91U.SI": "ESR-LOGOS REIT",
     "TS0U.SI": "OUE REIT",
     "CY6U.SI": "CapitaLand India Trust",
+    "CLAS.SI": "CapitaLand Ascott Trust",
+    "LREIT.SI": "Lendlease Global REIT",
+    "UHREIT.SI": "United Hampshire US REIT",
 }
 
 OUTPUT_PDF = "SG_REITs_Analysis.pdf"
