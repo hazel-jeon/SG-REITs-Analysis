@@ -172,11 +172,12 @@ def load_data():
             info  = stock.info
             hist  = stock.history(period="1y")["Close"]
 
+            # 가격 데이터 없으면 skip (사명변경·상장폐지 등)
             if hist.empty or len(hist) < 2:
-                print(f"  [Skip] {ticker}: 가격 데이터 없음 (사명변경/상장폐지 확인 필요)")
-            continue
-            ret   = hist.pct_change()
+                st.warning(f"{ticker} ({meta['name']}): 가격 데이터 없음 — 사명변경/상장폐지 확인 필요")
+                continue
 
+            ret   = hist.pct_change()
             combined = pd.concat([ret, bench_ret], axis=1).dropna()
             combined.columns = ["reit", "bench"]
 
@@ -269,11 +270,20 @@ with st.sidebar:
 with st.spinner("📡 Fetching market data..."):
     df_all = load_data()
 
+# df_all이 비어있거나 Sector 컬럼이 없으면 안전하게 중단
+if df_all.empty or "Sector" not in df_all.columns:
+    st.error("데이터를 불러오지 못했습니다. 네트워크 상태를 확인하거나 잠시 후 🔄 Refresh를 눌러주세요.")
+    st.stop()
+
 df = df_all[df_all["Sector"].isin(sel_sectors)].copy()
 if min_yield > 0:
     df = df[df["Yield(%)"].fillna(0) >= min_yield]
 if min_sharpe > 0:
     df = df[df["Sharpe"].fillna(-99) >= min_sharpe]
+
+if df.empty:
+    st.warning("선택한 필터 조건에 맞는 REIT가 없습니다. 필터를 조정해 주세요.")
+    st.stop()
 
 
 # ─────────────────────────────────────────────

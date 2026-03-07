@@ -22,6 +22,9 @@ def get_reit_analysis(reits_info, benchmark="CLR.SI"):
 
     # 벤치마크 수익률
     bench = yf.Ticker(benchmark).history(period="1y")["Close"]
+    if bench.empty:
+        print(f"  [Error] 벤치마크 {benchmark} 데이터 없음")
+        return pd.DataFrame()
     bench_ret = bench.pct_change()
 
     for ticker, name in reits_info.items():
@@ -30,11 +33,12 @@ def get_reit_analysis(reits_info, benchmark="CLR.SI"):
             info  = stock.info
             hist  = stock.history(period="1y")["Close"]
 
+            # 가격 데이터 없으면 skip (사명변경·상장폐지 등)
             if hist.empty or len(hist) < 2:
-                print(f"  [Skip] {ticker}: 가격 데이터 없음 (사명변경/상장폐지 확인 필요)")
-            continue
-            ret   = hist.pct_change()
+                print(f"  [Skip] {ticker}: 가격 데이터 없음 — 사명변경/상장폐지 확인 필요")
+                continue
 
+            ret   = hist.pct_change()
             combined = pd.concat([ret, bench_ret], axis=1).dropna()
             combined.columns = ["reit", "benchmark"]
             aligned_ret   = combined["reit"]
