@@ -37,9 +37,9 @@ REITS_CONFIG = {
     "T82U.SI":   {"name": "Suntec REIT",               "sector": "Retail/Office"},
     "TS0U.SI":   {"name": "OUE REIT",                  "sector": "Hospitality"},
     "CY6U.SI":   {"name": "CapitaLand India Trust",    "sector": "Industrial"},
-    "CLAS.SI":   {"name": "Ascott Trust",              "sector": "Hospitality"},
-    "LREIT.SI":  {"name": "Lendlease Global REIT",     "sector": "Retail/Office"},
-    "UHREIT.SI": {"name": "United Hampshire US REIT",  "sector": "Retail/Office"},
+    "HMN.SI":   {"name": "Ascott Trust",              "sector": "Hospitality"},
+    "JYEU.SI":  {"name": "Lendlease Global REIT",     "sector": "Retail/Office"},
+    "ODBU.SI": {"name": "United Hampshire US REIT",  "sector": "Retail/Office"},
 }
 
 SECTOR_COLORS = {

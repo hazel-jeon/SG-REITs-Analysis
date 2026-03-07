@@ -14,9 +14,9 @@ REITS_CONFIG = {
     "T82U.SI": "Suntec REIT",
     "TS0U.SI": "OUE REIT",
     "CY6U.SI": "CapitaLand India Trust",
-    "CLAS.SI": "CapitaLand Ascott Trust",
-    "LREIT.SI": "Lendlease Global REIT",
-    "UHREIT.SI": "United Hampshire US REIT",
+    "HMN.SI": "CapitaLand Ascott Trust",
+    "JYEU.SI": "Lendlease Global REIT",
+    "ODBU.SI": "United Hampshire US REIT",
 }
 
 OUTPUT_PDF = "SG_REITs_Analysis.pdf"

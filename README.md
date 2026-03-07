@@ -236,9 +236,9 @@ Selection criteria: market cap ≥ S$500M, stable yfinance data availability, se
 | T82U.SI | Suntec REIT | Retail/Office | SG / AU |
 | TS0U.SI | OUE REIT | Hospitality / Office | SG / AU |
 | CY6U.SI | CapitaLand India Trust | Industrial / Data Centre | IN |
-| CLAS.SI | CapitaLand Ascott Trust | Hospitality | 15+ countries |
-| LREIT.SI | Lendlease Global REIT | Retail/Office | SG / IT / US |
-| UHREIT.SI | United Hampshire US REIT | Retail / Self-Storage | US |
+| HMN.SI | CapitaLand Ascott Trust | Hospitality | 15+ countries |
+| JYEU.SI | Lendlease Global REIT | Retail/Office | SG / IT / US |
+| ODBU.SI | United Hampshire US REIT | Retail / Self-Storage | US |
 
 ---
 
