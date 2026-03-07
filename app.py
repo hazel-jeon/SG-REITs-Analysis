@@ -589,17 +589,23 @@ with tab3:
             mn, mx = radar_df[m].min(), radar_df[m].max()
             radar_df[m] = (radar_df[m] - mn) / (mx - mn + 1e-9)
 
+        def hex_to_rgba(hex_color, alpha=0.15):
+            h = hex_color.lstrip("#")
+            r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+            return f"rgba({r},{g},{b},{alpha})"
+
         fig_radar = go.Figure()
         for _, row in radar_df.iterrows():
             vals = [row[m] for m in radar_metrics]
             vals += [vals[0]]  # 닫기
+            sector_color = SECTOR_COLORS.get(row["Sector"], "#94a3b8")
             fig_radar.add_trace(go.Scatterpolar(
                 r=vals,
                 theta=radar_labels + [radar_labels[0]],
                 fill="toself",
                 name=row["Sector"],
-                line=dict(color=SECTOR_COLORS.get(row["Sector"], "#94a3b8"), width=2),
-                fillcolor=SECTOR_COLORS.get(row["Sector"], "#94a3b8").replace(")", ",0.12)").replace("rgb","rgba") if "rgb" in SECTOR_COLORS.get(row["Sector"],"") else SECTOR_COLORS.get(row["Sector"], "#94a3b8") + "20",
+                line=dict(color=sector_color, width=2),
+                fillcolor=hex_to_rgba(sector_color, alpha=0.15),
                 opacity=0.85,
             ))
         fig_radar.update_layout(
