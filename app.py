@@ -25,21 +25,21 @@ st.set_page_config(
 )
 
 REITS_CONFIG = {
-    "C38U.SI": {"name": "CapitaLand Integrated",    "sector": "Retail/Office"},
-    "A17U.SI": {"name": "CapitaLand Ascendas",      "sector": "Industrial"},
-    "N2IU.SI": {"name": "Mapletree Pan Asia",        "sector": "Retail/Office"},
-    "M44U.SI": {"name": "Mapletree Logistics",       "sector": "Logistics"},
-    "ME8U.SI": {"name": "Mapletree Industrial",      "sector": "Industrial"},
-    "BUOU.SI": {"name": "Frasers Centrepoint",       "sector": "Retail/Office"},
-    "AJBU.SI": {"name": "Keppel DC REIT",            "sector": "Data Centre"},
-    "J69U.SI": {"name": "Frasers Logistics",         "sector": "Logistics"},
-    "M1GU.SI": {"name": "Sabana Industrial",         "sector": "Industrial"},
-    "HMN.SI":  {"name": "OUE Hospitality",           "sector": "Hospitality"},
-    "C2PU.SI": {"name": "Parkway Life REIT",         "sector": "Healthcare"},
-    "T82U.SI": {"name": "Suntec REIT",               "sector": "Retail/Office"},
-    "J91U.SI": {"name": "ESR-LOGOS REIT",            "sector": "Logistics"},
-    "TS0U.SI": {"name": "OUE REIT",                  "sector": "Hospitality"},
-    "CY6U.SI": {"name": "CapitaLand India Trust",    "sector": "Industrial"},
+    "C38U.SI":   {"name": "CapitaLand Integrated",    "sector": "Retail/Office"},
+    "A17U.SI":   {"name": "CapitaLand Ascendas",      "sector": "Industrial"},
+    "N2IU.SI":   {"name": "Mapletree Pan Asia",        "sector": "Retail/Office"},
+    "M44U.SI":   {"name": "Mapletree Logistics",       "sector": "Logistics"},
+    "ME8U.SI":   {"name": "Mapletree Industrial",      "sector": "Industrial"},
+    "BUOU.SI":   {"name": "Frasers Centrepoint",       "sector": "Retail/Office"},
+    "AJBU.SI":   {"name": "Keppel DC REIT",            "sector": "Data Centre"},
+    "J69U.SI":   {"name": "Frasers Logistics",         "sector": "Logistics"},
+    "C2PU.SI":   {"name": "Parkway Life REIT",         "sector": "Healthcare"},
+    "T82U.SI":   {"name": "Suntec REIT",               "sector": "Retail/Office"},
+    "TS0U.SI":   {"name": "OUE REIT",                  "sector": "Hospitality"},
+    "CY6U.SI":   {"name": "CapitaLand India Trust",    "sector": "Industrial"},
+    "CLAS.SI":   {"name": "Ascott Trust",              "sector": "Hospitality"},
+    "LREIT.SI":  {"name": "Lendlease Global REIT",     "sector": "Retail/Office"},
+    "UHREIT.SI": {"name": "United Hampshire US REIT",  "sector": "Retail/Office"},
 }
 
 SECTOR_COLORS = {
