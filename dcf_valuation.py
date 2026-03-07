@@ -56,6 +56,96 @@ def nav_discount_premium(current_price: float, nav_per_unit: float) -> float | N
     return round((current_price - nav_per_unit) / nav_per_unit * 100, 2)
 
 
+
+
+# ─────────────────────────────────────────────
+# Monte Carlo DCF 시뮬레이션
+# ─────────────────────────────────────────────
+def monte_carlo_dcf(
+    dpu_current: float,
+    beta: float,
+    n: int = 10000,
+    years: int = 10,
+    # 성장률 분포 파라미터
+    growth_mean: float = 0.03,
+    growth_std: float  = 0.01,
+    # WACC 노이즈 파라미터
+    wacc_std: float    = 0.005,
+    # 영구성장률 분포 파라미터
+    pg_mean: float     = 0.025,
+    pg_std: float      = 0.005,
+    seed: int          = 42,
+) -> dict:
+    """
+    Monte Carlo 시뮬레이션으로 DCF 내재가치 분포 계산.
+
+    Args:
+        dpu_current : 현재 연간 DPU (SGD)
+        beta        : REIT 베타 (WACC 기준값 계산에 사용)
+        n           : 시뮬레이션 횟수 (기본 10,000회)
+        growth_mean : 배당 성장률 평균
+        growth_std  : 배당 성장률 표준편차
+        wacc_std    : WACC 노이즈 표준편차
+        pg_mean     : 영구 성장률 평균
+        pg_std      : 영구 성장률 표준편차
+        seed        : 재현성을 위한 랜덤 시드
+
+    Returns:
+        {
+          "values"  : np.array  # 유효한 시뮬레이션 결과 전체
+          "p10"     : float     # 10th percentile (비관 시나리오)
+          "p50"     : float     # 50th percentile (중립, 중앙값)
+          "p90"     : float     # 90th percentile (낙관 시나리오)
+          "mean"    : float     # 평균 내재가치
+          "std"     : float     # 표준편차
+          "n_valid" : int       # 유효 시뮬레이션 수
+          "params"  : dict      # 사용된 파라미터 기록
+        }
+    """
+    if dpu_current is None or dpu_current <= 0:
+        return {}
+
+    rng        = np.random.default_rng(seed)
+    base_wacc  = calculate_wacc(beta)
+
+    # 파라미터 샘플링 (벡터화로 속도 최적화)
+    growth_samples = rng.normal(growth_mean, growth_std,  n)
+    wacc_noise     = rng.normal(0,           wacc_std,    n)
+    pg_samples     = rng.normal(pg_mean,     pg_std,      n)
+    wacc_samples   = base_wacc + wacc_noise
+
+    results = []
+    for g, wacc, pg in zip(growth_samples, wacc_samples, pg_samples):
+        # 필수 조건: WACC > 영구성장률, 영구성장률 > 0
+        if wacc <= pg or pg <= 0 or wacc <= 0:
+            continue
+        val = dcf_reit(dpu_current, g, wacc, years=years, perpetual_growth=pg)
+        if val and val > 0:
+            results.append(val)
+
+    if not results:
+        return {}
+
+    arr = np.array(results)
+    return {
+        "values":  arr,
+        "p10":     float(np.percentile(arr, 10)),
+        "p50":     float(np.percentile(arr, 50)),
+        "p90":     float(np.percentile(arr, 90)),
+        "mean":    float(np.mean(arr)),
+        "std":     float(np.std(arr)),
+        "n_valid": len(arr),
+        "params": {
+            "base_wacc":   round(base_wacc, 4),
+            "growth_mean": growth_mean,
+            "growth_std":  growth_std,
+            "wacc_std":    wacc_std,
+            "pg_mean":     pg_mean,
+            "pg_std":      pg_std,
+            "n_total":     n,
+        },
+    }
+
 # ─────────────────────────────────────────────
 # 테스트용
 # ─────────────────────────────────────────────
