@@ -12,18 +12,48 @@ from utils import BENCHMARK_TICKER, DPU_GROWTH_RATE, PERPETUAL_GROWTH, DCF_YEARS
 
 
 # ─────────────────────────────────────────────
+# DPU 계산 헬퍼
+# ─────────────────────────────────────────────
+def _get_trailing_dpu(stock) -> float | None:
+    """
+    yfinance trailingAnnualDividendRate 대신
+    직접 배당 히스토리에서 최근 12개월 합산으로 DPU 계산.
+
+    trailingAnnualDividendRate는 반기/분기 지급 REIT에서
+    중복 집계 또는 누락이 발생해 DCF 왜곡을 일으킴.
+    """
+    try:
+        divs = stock.dividends
+        if divs.empty:
+            return None
+
+        now = pd.Timestamp.now(tz=divs.index.tz)
+        one_year_ago = now - pd.DateOffset(years=1)
+        trailing = divs[divs.index >= one_year_ago]
+
+        if trailing.empty:
+            return None
+
+        total = float(trailing.sum())
+        return total if total > 0 else None
+
+    except Exception:
+        # fallback: info 필드 사용
+        return stock.info.get("trailingAnnualDividendRate")
+
+
+# ─────────────────────────────────────────────
 # 1. 시장 데이터 분석 (기존 + DCF 연동)
 # ─────────────────────────────────────────────
 def get_reit_analysis(reits_info, benchmark=BENCHMARK_TICKER):
     """
     각 REIT의 1Y 수익률/변동성/베타/샤프 + DCF 내재가치/NAV 할인율 계산.
 
-    reits_info: {ticker: "name string"} 또는 {ticker: {"name": ..., "sector": ...}} 모두 허용.
+    reits_info: {ticker: "name"} 또는 {ticker: {"name":..., "sector":...}} 모두 허용.
     Returns: DataFrame
     """
     results = []
 
-    # 벤치마크 수익률
     bench = yf.Ticker(benchmark).history(period="1y")["Close"]
     if bench.empty:
         print(f"  [Error] 벤치마크 {benchmark} 데이터 없음")
@@ -31,19 +61,17 @@ def get_reit_analysis(reits_info, benchmark=BENCHMARK_TICKER):
     bench_ret = bench.pct_change()
 
     for ticker, meta in reits_info.items():
-        # meta가 dict면 name 추출, 문자열이면 그대로 사용
         name = meta["name"] if isinstance(meta, dict) else meta
         try:
             stock = yf.Ticker(ticker)
             info  = stock.info
             hist  = stock.history(period="1y")["Close"]
 
-            # 가격 데이터 없으면 skip (사명변경·상장폐지 등)
             if hist.empty or len(hist) < 2:
                 print(f"  [Skip] {ticker}: 가격 데이터 없음 — 사명변경/상장폐지 확인 필요")
                 continue
 
-            ret   = hist.pct_change()
+            ret      = hist.pct_change()
             combined = pd.concat([ret, bench_ret], axis=1).dropna()
             combined.columns = ["reit", "benchmark"]
             aligned_ret   = combined["reit"]
@@ -60,17 +88,17 @@ def get_reit_analysis(reits_info, benchmark=BENCHMARK_TICKER):
 
             # ── DCF 계산 ─────────────────────────────────
             current_price = info.get("regularMarketPrice") or hist.iloc[-1]
-            dpu           = info.get("trailingAnnualDividendRate")
-            nav_raw       = info.get("bookValue")          # fallback NAV
+            nav_raw       = info.get("bookValue")
 
-            wacc          = calculate_wacc(beta)
-            growth_rate   = DPU_GROWTH_RATE
+            # trailingAnnualDividendRate 대신 배당 히스토리 직접 합산
+            dpu  = _get_trailing_dpu(stock)
+            wacc = calculate_wacc(beta)
 
             dcf_value = None
             if dpu and dpu > 0:
                 dcf_value = dcf_reit(
                     dpu_current      = dpu,
-                    growth_rate      = growth_rate,
+                    growth_rate      = DPU_GROWTH_RATE,
                     discount_rate    = wacc,
                     years            = DCF_YEARS,
                     perpetual_growth = PERPETUAL_GROWTH,
@@ -80,7 +108,6 @@ def get_reit_analysis(reits_info, benchmark=BENCHMARK_TICKER):
             if nav_raw and nav_raw > 0:
                 nav_disc = nav_discount_premium(current_price, nav_raw)
 
-            # ── 업사이드 (DCF 기준) ───────────────────────
             upside = None
             if dcf_value and current_price and current_price > 0:
                 upside = (dcf_value / current_price - 1) * 100

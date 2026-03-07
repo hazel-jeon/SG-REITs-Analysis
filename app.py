@@ -15,6 +15,7 @@ from dcf_valuation import calculate_wacc, dcf_reit, nav_discount_premium, monte_
 from backtesting import compute_dcf_signals, run_backtest, rolling_backtest
 from portfolio_optimizer import run_optimization, summarize_weights, summarize_performance
 from utils import REITS_CONFIG, BENCHMARK_TICKER, DPU_GROWTH_RATE, PERPETUAL_GROWTH, DCF_YEARS, RISK_FREE_RATE
+from analysis import _get_trailing_dpu
 
 # ─────────────────────────────────────────────
 # Config
@@ -173,7 +174,7 @@ def load_data():
             sharpe  = (cum_ret - 0.03) / vol if vol != 0 else 0
 
             price = info.get("regularMarketPrice") or hist.iloc[-1]
-            dpu   = info.get("trailingAnnualDividendRate")
+            dpu   = _get_trailing_dpu(stock)
             dyield= info.get("trailingAnnualDividendYield")
             nav   = info.get("bookValue")
             wacc  = calculate_wacc(beta)
