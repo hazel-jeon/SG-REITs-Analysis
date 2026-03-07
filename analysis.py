@@ -8,14 +8,17 @@ import datetime
 import os
 
 from dcf_valuation import calculate_wacc, dcf_reit, nav_discount_premium
+from utils import BENCHMARK_TICKER, DPU_GROWTH_RATE, PERPETUAL_GROWTH, DCF_YEARS
 
 
 # ─────────────────────────────────────────────
 # 1. 시장 데이터 분석 (기존 + DCF 연동)
 # ─────────────────────────────────────────────
-def get_reit_analysis(reits_info, benchmark="CLR.SI"):
+def get_reit_analysis(reits_info, benchmark=BENCHMARK_TICKER):
     """
     각 REIT의 1Y 수익률/변동성/베타/샤프 + DCF 내재가치/NAV 할인율 계산.
+
+    reits_info: {ticker: "name string"} 또는 {ticker: {"name": ..., "sector": ...}} 모두 허용.
     Returns: DataFrame
     """
     results = []
@@ -27,7 +30,9 @@ def get_reit_analysis(reits_info, benchmark="CLR.SI"):
         return pd.DataFrame()
     bench_ret = bench.pct_change()
 
-    for ticker, name in reits_info.items():
+    for ticker, meta in reits_info.items():
+        # meta가 dict면 name 추출, 문자열이면 그대로 사용
+        name = meta["name"] if isinstance(meta, dict) else meta
         try:
             stock = yf.Ticker(ticker)
             info  = stock.info
@@ -59,7 +64,7 @@ def get_reit_analysis(reits_info, benchmark="CLR.SI"):
             nav_raw       = info.get("bookValue")          # fallback NAV
 
             wacc          = calculate_wacc(beta)
-            growth_rate   = 0.03                           # 3% 기본 배당 성장률 가정
+            growth_rate   = DPU_GROWTH_RATE
 
             dcf_value = None
             if dpu and dpu > 0:
@@ -67,8 +72,8 @@ def get_reit_analysis(reits_info, benchmark="CLR.SI"):
                     dpu_current      = dpu,
                     growth_rate      = growth_rate,
                     discount_rate    = wacc,
-                    years            = 10,
-                    perpetual_growth = 0.025,
+                    years            = DCF_YEARS,
+                    perpetual_growth = PERPETUAL_GROWTH,
                 )
 
             nav_disc = None

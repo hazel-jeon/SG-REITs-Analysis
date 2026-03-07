@@ -1,3 +1,10 @@
+# reit_data_collector.py
+"""
+sginvestors.io 크롤링으로 Gearing Ratio & NAV per Unit 수집.
+yfinance 기본 데이터(가격, DPU, Beta, 시총)도 함께 수집해
+sg_reits_data.csv로 저장. DCF 입력값으로 활용 가능.
+"""
+
 import yfinance as yf
 import pandas as pd
 import requests
@@ -5,43 +12,7 @@ from bs4 import BeautifulSoup
 import re
 import time
 
-# 분석할 REIT 티커 리스트
-reits = [
-    "C38U.SI",  # CapitaLand Integrated Commercial Trust
-    "A17U.SI",  # CapitaLand Ascendas REIT
-    "N2IU.SI",  # Mapletree Pan Asia Commercial Trust
-    "M44U.SI",  # Mapletree Logistics Trust
-    "ME8U.SI",  # Mapletree Industrial Trust
-    "BUOU.SI",  # Frasers Centrepoint Trust
-    "AJBU.SI",  # Keppel DC REIT
-    "J69U.SI",  # Frasers Logistics & Commercial Trust
-    "M1GU.SI",  # Sabana Industrial REIT
-    "HMN.SI",   # OUE Hospitality Trust
-    "C2PU.SI",  # Parkway Life REIT
-    "T82U.SI",  # Suntec REIT
-    "J91U.SI",  # ESR-LOGOS REIT
-    "TS0U.SI",  # OUE REIT
-    "CY6U.SI",  # CapitaLand India Trust
-]
-
-# SGX 코드 매핑 (티커 → SGX 단축코드, sginvestors.io URL용)
-SGX_CODE_MAP = {
-    "C38U.SI": "c38u",
-    "A17U.SI": "a17u",
-    "N2IU.SI": "n2iu",
-    "M44U.SI": "m44u",
-    "ME8U.SI": "me8u",
-    "BUOU.SI": "buou",
-    "AJBU.SI": "ajbu",
-    "J69U.SI": "j69u",
-    "M1GU.SI": "m1gu",
-    "HMN.SI":  "hmn",
-    "C2PU.SI": "c2pu",
-    "T82U.SI": "t82u",
-    "J91U.SI": "j91u",
-    "TS0U.SI": "ts0u",
-    "CY6U.SI": "cy6u",
-}
+from utils import REITS_CONFIG, SGX_CODE_MAP, RISK_FREE_RATE, MARKET_RISK_PREM, PERPETUAL_GROWTH
 
 HEADERS = {
     "User-Agent": (
@@ -69,8 +40,6 @@ def scrape_sginvestors(sgx_code: str) -> dict:
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # ── Gearing Ratio ──────────────────────────────
-        # sginvestors 구조: <td>Gearing Ratio</td><td>XX.X%</td>
         for row in soup.find_all("tr"):
             cells = row.find_all("td")
             if len(cells) >= 2:
@@ -80,14 +49,14 @@ def scrape_sginvestors(sgx_code: str) -> dict:
                 if "gearing" in label:
                     m = re.search(r"[\d.]+", value)
                     if m:
-                        result["gearing_ratio"] = float(m.group()) / 100  # 0.XX 형태
+                        result["gearing_ratio"] = float(m.group()) / 100
 
                 if "nav" in label and "unit" in label:
                     m = re.search(r"[\d.]+", value)
                     if m:
                         result["nav_per_unit"] = float(m.group())
 
-        # ── 대안: <span> / <div> 방식 페이지 구조 대응 ──
+        # 대안: <span> / <div> 방식 페이지 구조 대응
         if result["gearing_ratio"] is None:
             for tag in soup.find_all(string=re.compile(r"(?i)gearing")):
                 parent = tag.find_parent()
@@ -137,64 +106,62 @@ def get_nav_from_yfinance(ticker: str) -> float | None:
 # ─────────────────────────────────────────────
 # 3. 메인 데이터 수집
 # ─────────────────────────────────────────────
-data = pd.DataFrame(index=reits)
+def collect_all(reits_config: dict = REITS_CONFIG) -> pd.DataFrame:
+    """
+    REITS_CONFIG 기준으로 Yahoo Finance + sginvestors.io 데이터를 수집하고
+    DataFrame으로 반환. sg_reits_data.csv에도 저장.
+    """
+    tickers = list(reits_config.keys())
+    data = pd.DataFrame(index=tickers)
 
-print("=== Yahoo Finance 기본 데이터 수집 ===")
-for reit in reits:
-    ticker = yf.Ticker(reit)
-    info = ticker.info
+    print("=== Yahoo Finance 기본 데이터 수집 ===")
+    for ticker in tickers:
+        info = yf.Ticker(ticker).info
+        data.loc[ticker, "Name"]             = reits_config[ticker]["name"]
+        data.loc[ticker, "Sector"]           = reits_config[ticker]["sector"]
+        data.loc[ticker, "Current Price"]    = info.get("regularMarketPrice")
+        data.loc[ticker, "DPU (Trailing)"]   = info.get("trailingAnnualDividendRate")
+        data.loc[ticker, "Dividend Yield"]   = info.get("trailingAnnualDividendYield")
+        data.loc[ticker, "Beta"]             = info.get("beta")
+        data.loc[ticker, "Market Cap"]       = info.get("marketCap")
+        print(f"  {ticker} ({reits_config[ticker]['name']}) ✓")
 
-    data.loc[reit, "Current Price"]    = info.get("regularMarketPrice")
-    data.loc[reit, "DPU (Trailing)"]   = info.get("trailingAnnualDividendRate")
-    data.loc[reit, "Dividend Yield"]   = info.get("trailingAnnualDividendYield")
-    data.loc[reit, "Beta"]             = info.get("beta")
-    data.loc[reit, "Market Cap"]       = info.get("marketCap")
-    print(f"  {reit} ✓")
+    print("\n=== Gearing & NAV 크롤링 (sginvestors.io) ===")
+    for ticker in tickers:
+        sgx_code = SGX_CODE_MAP.get(ticker, ticker.replace(".SI", "").lower())
+        scraped  = scrape_sginvestors(sgx_code)
 
-# ─────────────────────────────────────────────
-# 4. Gearing & NAV 크롤링 (sginvestors.io)
-# ─────────────────────────────────────────────
-print("\n=== Gearing & NAV 크롤링 (sginvestors.io) ===")
-for reit in reits:
-    sgx_code = SGX_CODE_MAP.get(reit, reit.replace(".SI", "").lower())
-    scraped = scrape_sginvestors(sgx_code)
+        gearing = scraped["gearing_ratio"]
+        nav     = scraped["nav_per_unit"]
 
-    gearing = scraped["gearing_ratio"]
-    nav     = scraped["nav_per_unit"]
+        # NAV fallback: yfinance bookValue
+        if nav is None:
+            nav = get_nav_from_yfinance(ticker)
+            if nav:
+                print(f"  {ticker}: NAV fallback → yfinance bookValue = {nav:.4f}")
 
-    # NAV fallback: yfinance bookValue
-    if nav is None:
-        nav = get_nav_from_yfinance(reit)
-        if nav:
-            print(f"  {reit}: NAV fallback → yfinance bookValue = {nav:.4f}")
+        data.loc[ticker, "Gearing Ratio"] = gearing
+        data.loc[ticker, "NAV per Unit"]  = nav
 
-    data.loc[reit, "Gearing Ratio"] = gearing if gearing else None
-    data.loc[reit, "NAV per Unit"]  = nav if nav else None
+        status_g = f"{gearing:.1%}" if gearing else "N/A"
+        status_n = f"{nav:.4f}" if nav else "N/A"
+        print(f"  {ticker}: Gearing={status_g}, NAV={status_n}")
+        time.sleep(0.5)
 
-    status_g = f"{gearing:.1%}" if gearing else "N/A"
-    status_n = f"{nav:.4f}" if nav else "N/A"
-    print(f"  {reit}: Gearing={status_g}, NAV={status_n}")
+    print("\n=== WACC 추정 ===")
+    for ticker in tickers:
+        beta = data.loc[ticker, "Beta"]
+        if pd.notna(beta):
+            wacc = RISK_FREE_RATE + float(beta) * MARKET_RISK_PREM
+            data.loc[ticker, "Estimated WACC"] = round(wacc, 4)
 
-    time.sleep(0.5)  # 서버 부하 방지
+    data["Perpetual Growth"] = PERPETUAL_GROWTH
 
-# ─────────────────────────────────────────────
-# 5. WACC 추정 & 영구 성장률
-# ─────────────────────────────────────────────
-RISK_FREE_RATE    = 0.025
-MARKET_RISK_PREM  = 0.06
-PERPETUAL_GROWTH  = 0.025
+    data.to_csv("sg_reits_data.csv")
+    print("\n=== 수집 완료 → sg_reits_data.csv 저장 ===")
+    print(data.to_string())
+    return data
 
-for reit in reits:
-    beta = data.loc[reit, "Beta"]
-    if pd.notna(beta):
-        wacc = RISK_FREE_RATE + float(beta) * MARKET_RISK_PREM
-        data.loc[reit, "Estimated WACC"] = round(wacc, 4)
 
-data["Perpetual Growth"] = PERPETUAL_GROWTH
-
-# ─────────────────────────────────────────────
-# 6. 결과 저장
-# ─────────────────────────────────────────────
-data.to_csv("sg_reits_dcf_inputs.csv")
-print("\n=== 수집 완료 → sg_reits_dcf_inputs.csv 저장 ===")
-print(data.to_string())
+if __name__ == "__main__":
+    collect_all()

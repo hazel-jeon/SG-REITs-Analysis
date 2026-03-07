@@ -1,9 +1,7 @@
 # dcf_valuation.py
 import numpy as np
 import pandas as pd
-
-RISK_FREE_RATE   = 0.025   # 싱가포르 10년 국채 (2026 기준)
-MARKET_RISK_PREM = 0.06    # 아시아 시장 위험 프리미엄
+from utils import RISK_FREE_RATE, MARKET_RISK_PREM
 
 
 def calculate_wacc(beta: float,

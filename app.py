@@ -13,6 +13,8 @@ from plotly.subplots import make_subplots
 import datetime
 from dcf_valuation import calculate_wacc, dcf_reit, nav_discount_premium, monte_carlo_dcf
 from backtesting import compute_dcf_signals, run_backtest, rolling_backtest
+from portfolio_optimizer import run_optimization, summarize_weights, summarize_performance
+from utils import REITS_CONFIG, BENCHMARK_TICKER, DPU_GROWTH_RATE, PERPETUAL_GROWTH, DCF_YEARS, RISK_FREE_RATE
 
 # ─────────────────────────────────────────────
 # Config
@@ -23,24 +25,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-REITS_CONFIG = {
-    "C38U.SI":   {"name": "CapitaLand Integrated",    "sector": "Retail/Office"},
-    "A17U.SI":   {"name": "CapitaLand Ascendas",      "sector": "Industrial"},
-    "N2IU.SI":   {"name": "Mapletree Pan Asia",        "sector": "Retail/Office"},
-    "M44U.SI":   {"name": "Mapletree Logistics",       "sector": "Logistics"},
-    "ME8U.SI":   {"name": "Mapletree Industrial",      "sector": "Industrial"},
-    "BUOU.SI":   {"name": "Frasers Centrepoint",       "sector": "Retail/Office"},
-    "AJBU.SI":   {"name": "Keppel DC REIT",            "sector": "Data Centre"},
-    "J69U.SI":   {"name": "Frasers Logistics",         "sector": "Logistics"},
-    "C2PU.SI":   {"name": "Parkway Life REIT",         "sector": "Healthcare"},
-    "T82U.SI":   {"name": "Suntec REIT",               "sector": "Retail/Office"},
-    "TS0U.SI":   {"name": "OUE REIT",                  "sector": "Hospitality"},
-    "CY6U.SI":   {"name": "CapitaLand India Trust",    "sector": "Industrial"},
-    "HMN.SI":   {"name": "Ascott Trust",              "sector": "Hospitality"},
-    "JYEU.SI":  {"name": "Lendlease Global REIT",     "sector": "Retail/Office"},
-    "ODBU.SI": {"name": "United Hampshire US REIT",  "sector": "Retail/Office"},
-}
 
 SECTOR_COLORS = {
     "Retail/Office": "#2563eb",
@@ -196,7 +180,7 @@ def load_data():
 
             dcf_val = None
             if dpu and dpu > 0:
-                dcf_val = dcf_reit(dpu, 0.03, wacc, years=10, perpetual_growth=0.025)
+                dcf_val = dcf_reit(dpu, DPU_GROWTH_RATE, wacc, years=DCF_YEARS, perpetual_growth=PERPETUAL_GROWTH)
 
             nav_disc = nav_discount_premium(price, nav) if nav else None
             upside   = (dcf_val / price - 1) * 100 if dcf_val and price else None
@@ -336,13 +320,14 @@ st.markdown(f"""
 # ─────────────────────────────────────────────
 # Tab layout
 # ─────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "📈  Performance",
     "💰  DCF Valuation",
     "🗺️  Sector Analysis",
     "📊  Correlation",
     "🎲  Monte Carlo DCF",
     "⏱️  Backtesting",
+    "⚖️  Portfolio Optimizer",
 ])
 
 
@@ -1258,21 +1243,23 @@ with tab6:
             port_ret  = bt_result["portfolio_return"]
             bench_ret = bt_result["benchmark_return"]
             alpha     = bt_result["alpha"]
+            dcf_ret   = bt_result.get("dcf_return", port_ret)
+            dcf_alpha = bt_result.get("dcf_alpha", alpha)
             n_long    = bt_result["n_long"]
             n_total   = bt_result["n_total"]
             sharpe    = bt_result["sharpe"]
             mdd       = bt_result["max_drawdown"]
 
             # ── 결과 KPI ─────────────────────────────
-            k1, k2, k3, k4, k5, k6 = st.columns(6)
+            k1, k2, k3, k4, k5, k6, k7 = st.columns(7)
             kpi_data = [
-                (k1, "Portfolio Return",  f"{port_ret:+.2f}%",  "blue",  f"DCF Signal Long"),
-                (k2, "Benchmark Return",  f"{bench_ret:+.2f}%", "amber", "CLR.SI (STI ETF)"),
-                (k3, "Alpha",             f"{alpha:+.2f}%",     "green" if alpha >= 0 else "red",
-                                                                          "초과수익"),
-                (k4, "Sharpe Ratio",      f"{sharpe:.2f}" if sharpe else "N/A", "blue", "연율화"),
-                (k5, "Max Drawdown",      f"{mdd:.1f}%" if mdd else "N/A",      "red",  "최대 낙폭"),
-                (k6, "Long Positions",    f"{n_long}/{n_total}",                "amber", f"Upside≥{bt_threshold}%"),
+                (k1, "EW Return",       f"{port_ret:+.2f}%",  "blue",  "Equal-Weight 전략"),
+                (k2, "DCF-W Return",    f"{dcf_ret:+.2f}%",   "blue",  "DCF 가중 전략"),
+                (k3, "Benchmark",       f"{bench_ret:+.2f}%", "amber", "CLR.SI (STI ETF)"),
+                (k4, "EW Alpha",        f"{alpha:+.2f}%",     "green" if alpha >= 0 else "red",    "Equal-Weight 초과수익"),
+                (k5, "DCF-W Alpha",     f"{dcf_alpha:+.2f}%", "green" if dcf_alpha >= 0 else "red","DCF 가중 초과수익"),
+                (k6, "Sharpe (EW)",     f"{sharpe:.2f}" if sharpe else "N/A", "blue", "연율화"),
+                (k7, "Long Positions",  f"{n_long}/{n_total}",                "amber", f"Upside≥{bt_threshold}%"),
             ]
             for col, label, val, cls, sub in kpi_data:
                 with col:
@@ -1296,16 +1283,27 @@ with tab6:
                 bench_curve = bt_result["benchmark_curve"]
                 fig_bt = go.Figure()
 
-                # 포트폴리오 곡선
+                # 포트폴리오 곡선 (Equal-weight)
                 if not eq_curve.empty:
                     fig_bt.add_trace(go.Scatter(
                         x=eq_curve.index,
                         y=(eq_curve * 100).values,
-                        name="DCF Strategy",
+                        name="Equal-Weight DCF Signal",
                         line=dict(color="#2563eb", width=2.5),
                         fill="tozeroy",
                         fillcolor="rgba(37,99,235,0.07)",
-                        hovertemplate="%{x|%Y-%m-%d}<br>Return: %{y:.2f}%<extra>Portfolio</extra>",
+                        hovertemplate="%{x|%Y-%m-%d}<br>Return: %{y:.2f}%<extra>Equal-Weight</extra>",
+                    ))
+
+                # DCF 가중 곡선
+                dcf_curve = bt_result.get("dcf_curve")
+                if dcf_curve is not None and not dcf_curve.empty:
+                    fig_bt.add_trace(go.Scatter(
+                        x=dcf_curve.index,
+                        y=(dcf_curve * 100).values,
+                        name="DCF Weighted",
+                        line=dict(color="#7c3aed", width=2.5, dash="dot"),
+                        hovertemplate="%{x|%Y-%m-%d}<br>Return: %{y:.2f}%<extra>DCF Weighted</extra>",
                     ))
 
                 # 벤치마크 곡선
@@ -1476,3 +1474,251 @@ with tab6:
       &nbsp;⑤ <b>한계</b>: 거래비용·슬리피지 미반영, 생존자 편향 주의, 과거 성과가 미래를 보장하지 않음
     </div>
     """, unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════
+# TAB 7: Portfolio Optimizer
+# ══════════════════════════════════════════════
+with tab7:
+    st.markdown('<p class="section-title">포트폴리오 최적화 — 효율적 프론티어 & 전략 비교</p>', unsafe_allow_html=True)
+
+    # ── 컨트롤 패널 ───────────────────────────────
+    oc1, oc2, oc3 = st.columns([2, 2, 1])
+    with oc1:
+        min_w = st.slider("종목 최소 비중 (%)", 0, 10, 0, 1) / 100
+    with oc2:
+        max_w = st.slider("종목 최대 비중 (%)", 20, 100, 40, 5) / 100
+    with oc3:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        run_opt = st.button("▶  Run Optimizer", use_container_width=True, type="primary")
+
+    st.markdown("---")
+
+    # ── 최적화 실행 ───────────────────────────────
+    opt_cache_key = f"opt_{','.join(df['Ticker'])}_{min_w}_{max_w}"
+    if run_opt or st.session_state.get("opt_cache_key") != opt_cache_key:
+        with st.spinner("📡 가격 데이터 수집 + 포트폴리오 최적화 중..."):
+            opt_hist = load_price_history(list(df["Ticker"]))
+            opt_result = run_optimization(df, opt_hist, min_weight=min_w, max_weight=max_w)
+            st.session_state["opt_cache_key"] = opt_cache_key
+            st.session_state["opt_result"]    = opt_result
+    else:
+        opt_result = st.session_state.get("opt_result", {})
+
+    if not opt_result:
+        st.error("최적화 결과가 없습니다. 데이터를 확인하거나 필터를 조정해 주세요.")
+    else:
+        strategies  = opt_result["strategies"]
+        frontier_df = opt_result["frontier"]
+        tickers_opt = opt_result["tickers"]
+        names_opt   = opt_result["names"]
+
+        # ── 전략 색상 매핑 ────────────────────────
+        STRAT_COLORS = {
+            "Equal Weight":  "#94a3b8",
+            "Max Sharpe":    "#2563eb",
+            "Min Volatility":"#059669",
+            "DCF Weighted":  "#7c3aed",
+        }
+
+        # ── 행 1: 효율적 프론티어 + KPI 카드 ──────
+        col_frontier, col_kpi = st.columns([3, 2])
+
+        with col_frontier:
+            st.markdown('<p class="section-title">효율적 프론티어</p>', unsafe_allow_html=True)
+
+            fig_ef = go.Figure()
+
+            # 프론티어 곡선
+            if not frontier_df.empty:
+                fig_ef.add_trace(go.Scatter(
+                    x=frontier_df["Volatility"],
+                    y=frontier_df["Return"],
+                    mode="lines",
+                    name="Efficient Frontier",
+                    line=dict(color="#e2e8f0", width=2.5),
+                    fill="tozeroy",
+                    fillcolor="rgba(226,232,240,0.15)",
+                    hovertemplate="Vol: %{x:.2f}%<br>Return: %{y:.2f}%<extra>Frontier</extra>",
+                ))
+
+            # 각 전략 포인트
+            for key, res in strategies.items():
+                color = STRAT_COLORS.get(res["strategy"], "#64748b")
+                fig_ef.add_trace(go.Scatter(
+                    x=[res["volatility"] * 100],
+                    y=[res["return"] * 100],
+                    mode="markers+text",
+                    name=res["strategy"],
+                    text=[res["strategy"]],
+                    textposition="top center",
+                    textfont=dict(size=10, color=color),
+                    marker=dict(
+                        size=14,
+                        color=color,
+                        symbol="diamond" if key == "max_sharpe" else "circle",
+                        line=dict(width=2, color="white"),
+                    ),
+                    hovertemplate=(
+                        f"<b>{res['strategy']}</b><br>"
+                        f"Return: {res['return']*100:.2f}%<br>"
+                        f"Vol: {res['volatility']*100:.2f}%<br>"
+                        f"Sharpe: {res['sharpe']:.3f}<extra></extra>"
+                    ),
+                ))
+
+            fig_ef.update_layout(
+                height=400,
+                margin=dict(l=0, r=0, t=10, b=10),
+                plot_bgcolor="white", paper_bgcolor="white",
+                xaxis=dict(title="Volatility (%)", showgrid=True,
+                           gridcolor="#f1f5f9", ticksuffix="%"),
+                yaxis=dict(title="Expected Return (%)", showgrid=True,
+                           gridcolor="#f1f5f9", ticksuffix="%"),
+                legend=dict(orientation="h", yanchor="bottom", y=-0.3, x=0,
+                            font=dict(size=10)),
+                font=dict(family="DM Sans"),
+                hovermode="closest",
+            )
+            st.plotly_chart(fig_ef, use_container_width=True)
+
+        with col_kpi:
+            st.markdown('<p class="section-title">전략별 성과 비교</p>', unsafe_allow_html=True)
+
+            for key, res in strategies.items():
+                color  = STRAT_COLORS.get(res["strategy"], "#64748b")
+                is_best_sharpe = res["sharpe"] == max(r["sharpe"] for r in strategies.values())
+                badge = " 🏆" if is_best_sharpe else ""
+                st.markdown(f"""
+                <div style="padding:0.85rem 1rem;margin-bottom:0.6rem;background:white;
+                            border-radius:12px;border:1px solid #e2e8f0;
+                            border-left:4px solid {color}">
+                  <div style="font-size:0.75rem;color:{color};font-weight:700;
+                              text-transform:uppercase;letter-spacing:0.07em;
+                              margin-bottom:6px">{res['strategy']}{badge}</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                    <div>
+                      <div style="font-size:0.68rem;color:#94a3b8">Exp. Return</div>
+                      <div style="font-size:1rem;font-weight:700;
+                                  color:{'#059669' if res['return']>=0 else '#dc2626'}">
+                        {res['return']*100:+.2f}%</div>
+                    </div>
+                    <div>
+                      <div style="font-size:0.68rem;color:#94a3b8">Volatility</div>
+                      <div style="font-size:1rem;font-weight:700;color:#0f172a">
+                        {res['volatility']*100:.2f}%</div>
+                    </div>
+                    <div>
+                      <div style="font-size:0.68rem;color:#94a3b8">Sharpe</div>
+                      <div style="font-size:1rem;font-weight:700;color:{color}">
+                        {res['sharpe']:.3f}</div>
+                    </div>
+                  </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # ── 행 2: 종목별 비중 비교 ────────────────
+        st.markdown('<p class="section-title">종목별 비중 비교</p>', unsafe_allow_html=True)
+
+        weight_df = summarize_weights(opt_result)
+
+        col_bar, col_pie = st.columns(2)
+
+        with col_bar:
+            # 그룹 막대 차트
+            fig_w = go.Figure()
+            strat_cols = [
+                ("Equal Weight(%)",  "Equal Weight",  "#94a3b8"),
+                ("Max Sharpe(%)",    "Max Sharpe",    "#2563eb"),
+                ("Min Vol(%)",       "Min Volatility","#059669"),
+                ("DCF Weighted(%)",  "DCF Weighted",  "#7c3aed"),
+            ]
+            for col_name, label, color in strat_cols:
+                fig_w.add_trace(go.Bar(
+                    name=label,
+                    x=weight_df["Name"],
+                    y=weight_df[col_name],
+                    marker_color=color,
+                    opacity=0.85,
+                    hovertemplate=f"<b>%{{x}}</b><br>{label}: %{{y:.1f}}%<extra></extra>",
+                ))
+            fig_w.update_layout(
+                barmode="group",
+                height=360,
+                margin=dict(l=0, r=0, t=10, b=10),
+                plot_bgcolor="white", paper_bgcolor="white",
+                xaxis=dict(tickangle=-30, tickfont=dict(size=9), showgrid=False),
+                yaxis=dict(ticksuffix="%", showgrid=True,
+                           gridcolor="#f1f5f9", title="Weight (%)"),
+                legend=dict(orientation="h", yanchor="bottom", y=-0.4, x=0,
+                            font=dict(size=10)),
+                font=dict(family="DM Sans"),
+            )
+            st.plotly_chart(fig_w, use_container_width=True)
+
+        with col_pie:
+            # Max Sharpe 파이 차트 (비중 > 0.5% 만 표시)
+            st.markdown(
+                "<div style='font-size:0.82rem;font-weight:600;color:#0f172a;"
+                "margin-bottom:0.5rem'>Max Sharpe 비중 분포</div>",
+                unsafe_allow_html=True,
+            )
+            ms_weights = weight_df[weight_df["Max Sharpe(%)"] > 0.5]
+            fig_pie = go.Figure(go.Pie(
+                labels=ms_weights["Name"],
+                values=ms_weights["Max Sharpe(%)"],
+                hole=0.45,
+                textinfo="label+percent",
+                textfont=dict(size=10),
+                marker=dict(
+                    colors=[SECTOR_COLORS.get(
+                        df[df["Ticker"] == t]["Sector"].values[0]
+                        if len(df[df["Ticker"] == t]) > 0 else "", "#94a3b8"
+                    ) for t in ms_weights["Ticker"]],
+                    line=dict(color="white", width=1.5),
+                ),
+                pull=[0.03] * len(ms_weights),
+                hovertemplate="<b>%{label}</b><br>%{value:.1f}%<extra></extra>",
+            ))
+            fig_pie.update_layout(
+                height=360,
+                margin=dict(l=0, r=0, t=10, b=10),
+                paper_bgcolor="white",
+                showlegend=False,
+                font=dict(family="DM Sans"),
+            )
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+        # ── 행 3: 비중 테이블 ─────────────────────
+        with st.expander("📋  전략별 종목 비중 상세 테이블", expanded=False):
+            st.dataframe(
+                weight_df.style.format({
+                    "Equal Weight(%)":  "{:.1f}%",
+                    "Max Sharpe(%)":    "{:.1f}%",
+                    "Min Vol(%)":       "{:.1f}%",
+                    "DCF Weighted(%)":  "{:.1f}%",
+                }).background_gradient(
+                    subset=["Max Sharpe(%)"],
+                    cmap="Blues",
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        # ── 행 4: 방법론 노트 ─────────────────────
+        st.markdown(f"""
+        <div style="margin-top:1rem;padding:1rem 1.4rem;background:#f8fafc;
+                    border:1px solid #e2e8f0;border-radius:10px;
+                    font-size:0.78rem;color:#64748b;line-height:1.9">
+          <b>최적화 방법론</b><br>
+          &nbsp;① <b>Max Sharpe</b>: scipy.optimize SLSQP로 샤프 비율 최대화.
+              단일 종목 최대 {int(max_w*100)}%, 최소 {int(min_w*100)}% 제약 적용<br>
+          &nbsp;② <b>Min Volatility</b>: 동일 제약 하에 포트폴리오 연환산 변동성 최소화<br>
+          &nbsp;③ <b>DCF Weighted</b>: DCF 업사이드(%) 비례 규칙 기반 가중.
+              업사이드 음수 종목은 0 처리 후 정규화. 최적화 없음<br>
+          &nbsp;④ <b>Equal Weight</b>: 기준선 포트폴리오 (1/N)<br>
+          &nbsp;⑤ <b>입력 데이터</b>: 1Y 일별 수익률 기반 평균·공분산.
+              무위험수익률 {RISK_FREE_RATE*100:.1f}% (싱가포르 10년 국채)<br>
+          &nbsp;⑥ <b>한계</b>: 과거 수익률 기반 추정이므로 미래 보장 없음.
+              거래비용·세금 미반영. 수익률 정규분포 가정
+        </div>
+        """, unsafe_allow_html=True)

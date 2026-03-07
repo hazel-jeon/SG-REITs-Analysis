@@ -1,23 +1,6 @@
 from analysis import get_reit_analysis, generate_pdf_report
 from mailer import send_analysis_email
-
-REITS_CONFIG = {
-    "C38U.SI": "CapitaLand Integrated",
-    "A17U.SI": "CapitaLand Ascendas",
-    "N2IU.SI": "Mapletree Pan Asia",
-    "M44U.SI": "Mapletree Logistics",
-    "ME8U.SI": "Mapletree Industrial",
-    "BUOU.SI": "Frasers Centrepoint",
-    "AJBU.SI": "Keppel DC REIT",
-    "J69U.SI": "Frasers Logistics",
-    "C2PU.SI": "Parkway Life REIT",
-    "T82U.SI": "Suntec REIT",
-    "TS0U.SI": "OUE REIT",
-    "CY6U.SI": "CapitaLand India Trust",
-    "HMN.SI": "CapitaLand Ascott Trust",
-    "JYEU.SI": "Lendlease Global REIT",
-    "ODBU.SI": "United Hampshire US REIT",
-}
+from utils import REITS_CONFIG
 
 OUTPUT_PDF = "SG_REITs_Analysis.pdf"
 

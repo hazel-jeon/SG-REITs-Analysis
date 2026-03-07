@@ -13,6 +13,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from dcf_valuation import calculate_wacc, dcf_reit
+from utils import BENCHMARK_TICKER, DPU_GROWTH_RATE, PERPETUAL_GROWTH
 
 
 # ─────────────────────────────────────────────
@@ -65,9 +66,9 @@ def _get_dpu_at(ticker: str, as_of: pd.Timestamp) -> float | None:
 def compute_dcf_signals(
     reits_config: dict,
     entry_date: pd.Timestamp,
-    growth_rate: float = 0.03,
-    perpetual_growth: float = 0.025,
-    upside_threshold: float = 0.10,   # 10% 이상 업사이드면 매수 신호
+    growth_rate: float = DPU_GROWTH_RATE,
+    perpetual_growth: float = PERPETUAL_GROWTH,
+    upside_threshold: float = 0.10,
 ) -> pd.DataFrame:
     """
     entry_date 시점 기준으로 각 REIT의 DCF 업사이드를 계산하고
@@ -79,9 +80,10 @@ def compute_dcf_signals(
     rows = []
     for ticker, meta in reits_config.items():
         try:
+            # meta가 dict이면 name 추출, 문자열이면 그대로 사용
             name = meta["name"] if isinstance(meta, dict) else meta
 
-            # 1. entry_date 기준 가격 히스토리 (entry 포함 과거 2년)
+            # 1. entry_date 기준 가격 히스토리
             period_start = entry_date - pd.DateOffset(years=2)
             hist = yf.Ticker(ticker).history(
                 start=period_start.strftime("%Y-%m-%d"),
@@ -151,7 +153,7 @@ def run_backtest(
     signals_df: pd.DataFrame,
     entry_date: pd.Timestamp,
     exit_date: pd.Timestamp,
-    benchmark: str = "CLR.SI",
+    benchmark: str = BENCHMARK_TICKER,
 ) -> dict:
     """
     signals_df의 Signal=1 종목을 equal-weight 매수 후
@@ -252,13 +254,34 @@ def run_backtest(
     details_df = pd.DataFrame(detail_rows)
 
     # ── Equal-weight 포트폴리오 일별 수익률 곡선 ──
-    price_df     = pd.DataFrame(daily_prices).dropna(how="all")
-    eq_curve     = price_df.mean(axis=1)           # equal-weight 평균
-    daily_ret    = eq_curve.diff().dropna()
+    price_df  = pd.DataFrame(daily_prices).dropna(how="all")
+    eq_curve  = price_df.mean(axis=1)
+    daily_ret = eq_curve.diff().dropna()
 
-    port_return  = float(eq_curve.iloc[-1]) if not eq_curve.empty else 0.0
+    port_return = float(eq_curve.iloc[-1]) if not eq_curve.empty else 0.0
 
-    # ── 성과 지표 ─────────────────────────────────
+    # ── DCF 가중 포트폴리오 일별 곡선 ────────────
+    # 업사이드 양수 종목만, 업사이드 크기 비례 가중
+    upside_map = details_df.set_index("Ticker")["DCF_Upside(%)"].to_dict()
+    dcf_weights = {}
+    for t in price_df.columns:
+        u = upside_map.get(t, 0) or 0
+        if u > 0:
+            dcf_weights[t] = u
+    total_w = sum(dcf_weights.values())
+
+    if total_w > 0 and len(dcf_weights) >= 1:
+        dcf_curve = sum(
+            price_df[t] * (w / total_w)
+            for t, w in dcf_weights.items()
+            if t in price_df.columns
+        )
+        dcf_return = float(dcf_curve.iloc[-1]) if not dcf_curve.empty else port_return
+    else:
+        dcf_curve  = eq_curve.copy()   # fallback: equal-weight
+        dcf_return = port_return
+
+    # ── 성과 지표 (equal-weight 기준) ─────────────
     ann_factor = 252
     sharpe = None
     if len(daily_ret) > 10:
@@ -269,23 +292,46 @@ def run_backtest(
 
     max_drawdown = None
     if not eq_curve.empty:
-        roll_max  = (1 + eq_curve).cummax()
-        drawdown  = (1 + eq_curve) / roll_max - 1
+        roll_max     = (1 + eq_curve).cummax()
+        drawdown     = (1 + eq_curve) / roll_max - 1
         max_drawdown = round(float(drawdown.min()) * 100, 2)
 
-    alpha = port_return - bench_return
+    # DCF 가중 성과 지표
+    dcf_daily_ret = dcf_curve.diff().dropna()
+    dcf_sharpe = None
+    if len(dcf_daily_ret) > 10:
+        m, s = dcf_daily_ret.mean(), dcf_daily_ret.std()
+        if s > 0:
+            dcf_sharpe = round((m / s) * np.sqrt(ann_factor), 3)
+
+    dcf_mdd = None
+    if not dcf_curve.empty:
+        dcf_roll_max = (1 + dcf_curve).cummax()
+        dcf_dd       = (1 + dcf_curve) / dcf_roll_max - 1
+        dcf_mdd      = round(float(dcf_dd.min()) * 100, 2)
+
+    alpha     = port_return - bench_return
+    dcf_alpha = dcf_return - bench_return
 
     return {
+        # Equal-weight
         "portfolio_return": round(port_return * 100, 2),
         "benchmark_return": round(bench_return * 100, 2),
         "alpha":            round(alpha * 100, 2),
-        "details":          details_df,
+        "sharpe":           sharpe,
+        "max_drawdown":     max_drawdown,
         "equity_curve":     eq_curve,
+        # DCF-weighted
+        "dcf_return":       round(dcf_return * 100, 2),
+        "dcf_alpha":        round(dcf_alpha * 100, 2),
+        "dcf_sharpe":       dcf_sharpe,
+        "dcf_max_drawdown": dcf_mdd,
+        "dcf_curve":        dcf_curve,
+        # 공통
+        "details":          details_df,
         "benchmark_curve":  bench_curve,
         "n_long":           n_long,
         "n_total":          n_total,
-        "sharpe":           sharpe,
-        "max_drawdown":     max_drawdown,
     }
 
 
@@ -294,9 +340,9 @@ def run_backtest(
 # ─────────────────────────────────────────────
 def rolling_backtest(
     reits_config: dict,
-    periods: list[tuple],   # [(entry_date_str, exit_date_str, label), ...]
+    periods: list[tuple],
     upside_threshold: float = 0.10,
-    benchmark: str = "CLR.SI",
+    benchmark: str = BENCHMARK_TICKER,
 ) -> pd.DataFrame:
     """
     여러 기간에 걸쳐 백테스팅을 반복 실행해
@@ -341,7 +387,7 @@ def rolling_backtest(
 # 테스트
 # ─────────────────────────────────────────────
 if __name__ == "__main__":
-    from main import REITS_CONFIG
+    from utils import REITS_CONFIG
 
     entry = pd.Timestamp("2024-01-02")
     exit_ = pd.Timestamp("2024-12-31")
