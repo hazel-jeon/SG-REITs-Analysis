@@ -220,23 +220,25 @@ g_p   ~ N(2.5%, 0.5%)     # Perpetual growth rate
 
 ## 📊 Coverage Universe (15 S-REITs)
 
-| Ticker | Name | Sector |
-|---|---|---|
-| C38U.SI | CapitaLand Integrated Commercial Trust | Retail/Office |
-| A17U.SI | CapitaLand Ascendas REIT | Industrial |
-| N2IU.SI | Mapletree Pan Asia Commercial Trust | Retail/Office |
-| M44U.SI | Mapletree Logistics Trust | Logistics |
-| ME8U.SI | Mapletree Industrial Trust | Industrial |
-| BUOU.SI | Frasers Centrepoint Trust | Retail/Office |
-| AJBU.SI | Keppel DC REIT | Data Centre |
-| J69U.SI | Frasers Logistics & Commercial Trust | Logistics |
-| M1GU.SI | Sabana Industrial REIT | Industrial |
-| HMN.SI | OUE Hospitality Trust | Hospitality |
-| C2PU.SI | Parkway Life REIT | Healthcare |
-| T82U.SI | Suntec REIT | Retail/Office |
-| J91U.SI | ESR-REIT (formerly ESR-LOGOS) | Logistics |
-| TS0U.SI | OUE REIT | Hospitality |
-| CY6U.SI | CapitaLand India Trust | Industrial |
+Selection criteria: market cap ≥ S$500M, stable yfinance data availability, sector & geographic diversification.
+
+| Ticker | Name | Sector | Geography |
+|---|---|---|---|
+| C38U.SI | CapitaLand Integrated Commercial Trust | Retail/Office | SG |
+| A17U.SI | CapitaLand Ascendas REIT | Industrial | SG / AU / EU / US |
+| N2IU.SI | Mapletree Pan Asia Commercial Trust | Retail/Office | SG / JP / KR / HK |
+| M44U.SI | Mapletree Logistics Trust | Logistics | 9 countries |
+| ME8U.SI | Mapletree Industrial Trust | Industrial / Data Centre | SG / US |
+| BUOU.SI | Frasers Centrepoint Trust | Retail/Office | SG |
+| AJBU.SI | Keppel DC REIT | Data Centre | SG / EU / AU |
+| J69U.SI | Frasers Logistics & Commercial Trust | Logistics | AU / EU |
+| C2PU.SI | Parkway Life REIT | Healthcare | SG / JP |
+| T82U.SI | Suntec REIT | Retail/Office | SG / AU |
+| TS0U.SI | OUE REIT | Hospitality / Office | SG / AU |
+| CY6U.SI | CapitaLand India Trust | Industrial / Data Centre | IN |
+| CLAS.SI | CapitaLand Ascott Trust | Hospitality | 15+ countries |
+| LREIT.SI | Lendlease Global REIT | Retail/Office | SG / IT / US |
+| UHREIT.SI | United Hampshire US REIT | Retail / Self-Storage | US |
 
 ---
 
