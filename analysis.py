@@ -29,6 +29,10 @@ def get_reit_analysis(reits_info, benchmark="CLR.SI"):
             stock = yf.Ticker(ticker)
             info  = stock.info
             hist  = stock.history(period="1y")["Close"]
+
+            if hist.empty or len(hist) < 2:
+                print(f"  [Skip] {ticker}: 가격 데이터 없음 (사명변경/상장폐지 확인 필요)")
+            continue
             ret   = hist.pct_change()
 
             combined = pd.concat([ret, bench_ret], axis=1).dropna()
