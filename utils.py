@@ -29,7 +29,7 @@ REITS_CONFIG = {
     "CY6U.SI": {"name": "CapitaLand India Trust",   "sector": "Industrial"},
     "HMN.SI":  {"name": "CapitaLand Ascott Trust",  "sector": "Hospitality"},
     "JYEU.SI": {"name": "Lendlease Global REIT",    "sector": "Retail/Office"},
-    "ODBU.SI": {"name": "United Hampshire US REIT", "sector": "Retail/Office"},
+    "Q5T.SI":  {"name": "Far East Hospitality",     "sector": "Hospitality"},
 }
 
 # ── SGX 코드 매핑 (sginvestors.io 크롤링용) ──
@@ -48,5 +48,5 @@ SGX_CODE_MAP = {
     "CY6U.SI": "cy6u",
     "HMN.SI":  "hmn",
     "JYEU.SI": "jyeu",
-    "ODBU.SI": "odbu",
+    "Q5T.SI":  "q5t",
 }
