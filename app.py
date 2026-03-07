@@ -544,18 +544,33 @@ with tab2:
 # TAB 3: Sector Analysis
 # ══════════════════════════════════════════════
 with tab3:
+
+    # ── 섹터 집계 ─────────────────────────────────
+    sec_agg = df.groupby("Sector").agg(
+        Avg_Return  = ("Return(%)", "mean"),
+        Avg_Yield   = ("Yield(%)", "mean"),
+        Avg_Sharpe  = ("Sharpe", "mean"),
+        Avg_Beta    = ("Beta", "mean"),
+        Avg_Vol     = ("Vol(%)", "mean"),
+        Avg_Upside  = ("Upside(%)", "mean"),
+        Count       = ("Ticker", "count"),
+    ).round(2).reset_index()
+
+    # ── 행 1: 도넛 + 레이더 ───────────────────────
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown('<p class="section-title">Market Cap by Sector</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-title">섹터 구성 (종목 수)</p>', unsafe_allow_html=True)
         sector_counts = df.groupby("Sector").size().reset_index(name="Count")
         fig5 = px.pie(
             sector_counts, names="Sector", values="Count",
             color="Sector", color_discrete_map=SECTOR_COLORS,
             hole=0.55,
         )
-        fig5.update_traces(textposition="outside", textinfo="label+percent",
-                           textfont_size=11, pull=[0.03]*len(sector_counts))
+        fig5.update_traces(
+            textposition="outside", textinfo="label+value",
+            textfont_size=11, pull=[0.03]*len(sector_counts),
+        )
         fig5.update_layout(
             height=340, margin=dict(l=20,r=20,t=20,b=20),
             showlegend=False, paper_bgcolor="white",
@@ -564,44 +579,138 @@ with tab3:
         st.plotly_chart(fig5, use_container_width=True)
 
     with col2:
-        st.markdown('<p class="section-title">Sector Avg Metrics</p>', unsafe_allow_html=True)
-        sec_agg = df.groupby("Sector").agg(
-            Avg_Return  = ("Return(%)", "mean"),
-            Avg_Yield   = ("Yield(%)", "mean"),
-            Avg_Sharpe  = ("Sharpe", "mean"),
-            Avg_Beta    = ("Beta", "mean"),
-            Count       = ("Ticker", "count"),
-        ).round(2).reset_index()
+        st.markdown('<p class="section-title">섹터 레이더 차트 (다차원 비교)</p>', unsafe_allow_html=True)
 
-        fig6 = go.Figure()
-        metrics = ["Avg_Return", "Avg_Yield", "Avg_Sharpe"]
-        labels  = ["Avg Return (%)", "Avg Yield (%)", "Avg Sharpe"]
-        for m, lbl in zip(metrics, labels):
-            fig6.add_trace(go.Bar(
-                name=lbl, x=sec_agg["Sector"], y=sec_agg[m],
-                text=[f"{v:.2f}" for v in sec_agg[m]],
-                textposition="outside", textfont_size=9,
+        # 0~1 정규화 (레이더용)
+        radar_metrics = ["Avg_Return","Avg_Yield","Avg_Sharpe","Avg_Upside"]
+        radar_labels  = ["Return","Yield","Sharpe","DCF Upside"]
+        radar_df = sec_agg[["Sector"] + radar_metrics].copy()
+        for m in radar_metrics:
+            mn, mx = radar_df[m].min(), radar_df[m].max()
+            radar_df[m] = (radar_df[m] - mn) / (mx - mn + 1e-9)
+
+        fig_radar = go.Figure()
+        for _, row in radar_df.iterrows():
+            vals = [row[m] for m in radar_metrics]
+            vals += [vals[0]]  # 닫기
+            fig_radar.add_trace(go.Scatterpolar(
+                r=vals,
+                theta=radar_labels + [radar_labels[0]],
+                fill="toself",
+                name=row["Sector"],
+                line=dict(color=SECTOR_COLORS.get(row["Sector"], "#94a3b8"), width=2),
+                fillcolor=SECTOR_COLORS.get(row["Sector"], "#94a3b8").replace(")", ",0.12)").replace("rgb","rgba") if "rgb" in SECTOR_COLORS.get(row["Sector"],"") else SECTOR_COLORS.get(row["Sector"], "#94a3b8") + "20",
+                opacity=0.85,
             ))
-        fig6.update_layout(
-            barmode="group", height=340,
-            margin=dict(l=0,r=0,t=10,b=10),
-            plot_bgcolor="white", paper_bgcolor="white",
-            xaxis=dict(showgrid=False, tickfont=dict(size=10)),
-            yaxis=dict(showgrid=True, gridcolor="#f1f5f9"),
-            legend=dict(orientation="h", yanchor="bottom", y=-0.3, x=0, font=dict(size=10)),
+        fig_radar.update_layout(
+            polar=dict(
+                radialaxis=dict(visible=True, range=[0,1], tickfont=dict(size=8), showticklabels=False),
+                angularaxis=dict(tickfont=dict(size=11)),
+                bgcolor="white",
+            ),
+            height=340, margin=dict(l=30,r=30,t=20,b=20),
+            paper_bgcolor="white",
+            legend=dict(orientation="h", yanchor="bottom", y=-0.18, x=0, font=dict(size=10)),
             font=dict(family="DM Sans"),
+            showlegend=True,
         )
-        st.plotly_chart(fig6, use_container_width=True)
+        st.plotly_chart(fig_radar, use_container_width=True)
 
-    # Sector table
-    st.markdown('<p class="section-title">Sector Summary Table</p>', unsafe_allow_html=True)
+    # ── 행 2: 섹터별 Sharpe vs Yield 버블 차트 ────
+    st.markdown('<p class="section-title">섹터별 Sharpe vs Yield (버블 = 평균 Return 크기)</p>', unsafe_allow_html=True)
+
+    bubble_df = sec_agg.copy()
+    bubble_df["bubble_size"] = bubble_df["Avg_Return"].clip(lower=1) * 4
+
+    fig_bubble = go.Figure()
+    for _, row in bubble_df.iterrows():
+        fig_bubble.add_trace(go.Scatter(
+            x=[row["Avg_Yield"]],
+            y=[row["Avg_Sharpe"]],
+            mode="markers+text",
+            name=row["Sector"],
+            text=[row["Sector"]],
+            textposition="top center",
+            textfont=dict(size=10),
+            marker=dict(
+                size=max(row["bubble_size"], 12),
+                color=SECTOR_COLORS.get(row["Sector"], "#94a3b8"),
+                opacity=0.82,
+                line=dict(width=1.5, color="white"),
+            ),
+            hovertemplate=(
+                f"<b>{row['Sector']}</b><br>"
+                f"Avg Yield: {row['Avg_Yield']:.2f}%<br>"
+                f"Avg Sharpe: {row['Avg_Sharpe']:.2f}<br>"
+                f"Avg Return: {row['Avg_Return']:.2f}%<br>"
+                f"# REITs: {int(row['Count'])}<extra></extra>"
+            ),
+        ))
+    fig_bubble.add_hline(y=0, line_dash="dot", line_color="#94a3b8", line_width=1)
+    fig_bubble.update_layout(
+        height=340,
+        margin=dict(l=0,r=0,t=10,b=10),
+        plot_bgcolor="white", paper_bgcolor="white",
+        xaxis=dict(title="Avg Dividend Yield (%)", showgrid=True, gridcolor="#f1f5f9", ticksuffix="%"),
+        yaxis=dict(title="Avg Sharpe Ratio", showgrid=True, gridcolor="#f1f5f9"),
+        showlegend=False,
+        font=dict(family="DM Sans"),
+    )
+    st.plotly_chart(fig_bubble, use_container_width=True)
+
+    # ── 행 3: 섹터별 종목 상세 카드 ──────────────
+    st.markdown('<p class="section-title">섹터별 종목 상세</p>', unsafe_allow_html=True)
+
+    sector_list = sorted(df["Sector"].unique())
+    tabs_sector = st.tabs(sector_list)
+
+    for tab_s, sector_name in zip(tabs_sector, sector_list):
+        with tab_s:
+            sector_df = df[df["Sector"] == sector_name].sort_values("Sharpe", ascending=False)
+            s_color   = SECTOR_COLORS.get(sector_name, "#64748b")
+
+            cards_html = ""
+            for _, r in sector_df.iterrows():
+                ret_color  = "#059669" if r["Return(%)"] >= 0 else "#dc2626"
+                up_val     = r.get("Upside(%)")
+                up_str     = f"{up_val:+.1f}%" if pd.notna(up_val) and up_val is not None else "N/A"
+                up_color   = "#059669" if (pd.notna(up_val) and up_val and up_val >= 0) else "#dc2626"
+                yield_str  = f"{r['Yield(%)']:.2f}%" if pd.notna(r.get("Yield(%)")) else "N/A"
+
+                cards_html += f"""
+                <div style="display:inline-block;width:calc(20% - 12px);min-width:160px;
+                            margin:0 6px 12px 0;padding:1rem;background:white;
+                            border-radius:12px;border:1px solid #e2e8f0;
+                            border-top:3px solid {s_color};vertical-align:top;
+                            box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+                  <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:2px">{r['Ticker']}</div>
+                  <div style="font-size:0.88rem;font-weight:700;color:#0f172a;margin-bottom:8px;
+                              line-height:1.2">{r['Name']}</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.78rem">
+                    <div><span style="color:#94a3b8">Return</span><br>
+                      <b style="color:{ret_color}">{r['Return(%)']}%</b></div>
+                    <div><span style="color:#94a3b8">Yield</span><br>
+                      <b style="color:#0f172a">{yield_str}</b></div>
+                    <div><span style="color:#94a3b8">Sharpe</span><br>
+                      <b style="color:#0f172a">{r['Sharpe']}</b></div>
+                    <div><span style="color:#94a3b8">DCF↑</span><br>
+                      <b style="color:{up_color}">{up_str}</b></div>
+                  </div>
+                </div>"""
+
+            st.markdown(f'<div style="line-height:1">{cards_html}</div>', unsafe_allow_html=True)
+
+    # ── 행 4: 섹터 요약 테이블 ───────────────────
+    st.markdown('<p class="section-title">섹터 요약 테이블</p>', unsafe_allow_html=True)
     st.dataframe(
         sec_agg.rename(columns={
-            "Avg_Return": "Avg Return (%)",
-            "Avg_Yield":  "Avg Yield (%)",
-            "Avg_Sharpe": "Avg Sharpe",
-            "Avg_Beta":   "Avg Beta",
-            "Count":      "# REITs",
+            "Avg_Return":  "Avg Return (%)",
+            "Avg_Yield":   "Avg Yield (%)",
+            "Avg_Sharpe":  "Avg Sharpe",
+            "Avg_Beta":    "Avg Beta",
+            "Avg_Vol":     "Avg Vol (%)",
+            "Avg_Upside":  "Avg DCF Upside (%)",
+            "Count":       "# REITs",
         }),
         use_container_width=True,
         hide_index=True,
@@ -612,48 +721,194 @@ with tab3:
 # TAB 4: Correlation
 # ══════════════════════════════════════════════
 with tab4:
-    st.markdown('<p class="section-title">Return Correlation Matrix</p>', unsafe_allow_html=True)
 
-    with st.spinner("Computing correlations..."):
-        tickers = list(df["Ticker"])
+    with st.spinner("수익률 상관계수 계산 중..."):
+        tickers  = list(df["Ticker"])
         hist_all = load_price_history(tickers)
-        price_df = pd.DataFrame({
-            REITS_CONFIG[t]["name"][:15]: h
-            for t, h in hist_all.items()
-        }).dropna()
-        corr = price_df.pct_change().corr()
 
-    fig7 = go.Figure(go.Heatmap(
-        z=corr.values,
-        x=corr.columns,
-        y=corr.index,
+        # 섹터 레이블 포함 이름 매핑
+        name_map = {
+            t: f"{REITS_CONFIG[t]['name'][:13]}"
+            for t in tickers if t in hist_all
+        }
+        price_df = pd.DataFrame({
+            name_map[t]: h
+            for t, h in hist_all.items() if t in name_map
+        }).dropna(how="all").fillna(method="ffill").dropna()
+
+        ret_df = price_df.pct_change().dropna()
+        corr   = ret_df.corr()
+
+        # 섹터 순서로 정렬 (같은 섹터끼리 모이게)
+        ticker_sector = {
+            REITS_CONFIG[t]["name"][:13]: REITS_CONFIG[t]["sector"]
+            for t in tickers if t in hist_all
+        }
+        sorted_names = sorted(
+            corr.columns,
+            key=lambda n: (ticker_sector.get(n, "Z"), n)
+        )
+        corr = corr.loc[sorted_names, sorted_names]
+
+    # ── 히트맵 ────────────────────────────────────
+    col_heat, col_info = st.columns([3, 1])
+
+    with col_heat:
+        st.markdown('<p class="section-title">수익률 상관계수 매트릭스 (섹터 기준 정렬)</p>', unsafe_allow_html=True)
+
+        # 섹터 경계선 위치 계산
+        sector_boundaries = []
+        prev_sector = None
+        for i, name in enumerate(corr.columns):
+            sec = ticker_sector.get(name, "")
+            if sec != prev_sector and i > 0:
+                sector_boundaries.append(i - 0.5)
+            prev_sector = sec
+
+        fig7 = go.Figure(go.Heatmap(
+            z=corr.values,
+            x=corr.columns.tolist(),
+            y=corr.index.tolist(),
+            colorscale=[
+                [0.0,  "#dc2626"],
+                [0.35, "#fca5a5"],
+                [0.5,  "#f8fafc"],
+                [0.65, "#93c5fd"],
+                [1.0,  "#1d4ed8"],
+            ],
+            zmin=-1, zmax=1,
+            text=np.round(corr.values, 2),
+            texttemplate="%{text}",
+            textfont=dict(size=8.5),
+            hoverongaps=False,
+            colorbar=dict(
+                title=dict(text="Corr", side="right"),
+                thickness=14,
+                tickvals=[-1, -0.5, 0, 0.5, 1],
+            ),
+        ))
+
+        # 섹터 경계선 추가
+        for b in sector_boundaries:
+            fig7.add_shape(type="line", x0=b, x1=b, y0=-0.5, y1=len(corr)-0.5,
+                           line=dict(color="#1e293b", width=1.5))
+            fig7.add_shape(type="line", y0=b, y1=b, x0=-0.5, x1=len(corr)-0.5,
+                           line=dict(color="#1e293b", width=1.5))
+
+        fig7.update_layout(
+            height=520,
+            margin=dict(l=0, r=0, t=10, b=10),
+            paper_bgcolor="white",
+            xaxis=dict(tickfont=dict(size=9), tickangle=-40, side="bottom"),
+            yaxis=dict(tickfont=dict(size=9), autorange="reversed"),
+            font=dict(family="DM Sans"),
+        )
+        st.plotly_chart(fig7, use_container_width=True)
+
+    # ── 분산 효과 추천 페어 ───────────────────────
+    with col_info:
+        st.markdown('<p class="section-title">📌 낮은 상관 페어 TOP 5</p>', unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font-size:0.75rem;color:#94a3b8;margin-bottom:0.7rem'>"
+            "포트폴리오 분산 효과가 큰 종목 조합</div>",
+            unsafe_allow_html=True
+        )
+
+        # 상삼각 행렬에서 페어 추출
+        pairs = []
+        cols_ = corr.columns.tolist()
+        for i in range(len(cols_)):
+            for j in range(i+1, len(cols_)):
+                pairs.append((cols_[i], cols_[j], corr.iloc[i, j]))
+
+        pairs_df = pd.DataFrame(pairs, columns=["A","B","Corr"]).sort_values("Corr")
+
+        for _, pr in pairs_df.head(5).iterrows():
+            c_val  = pr["Corr"]
+            c_color = "#059669" if c_val < 0.3 else "#d97706"
+            st.markdown(f"""
+            <div style="padding:0.65rem 0.8rem;margin-bottom:0.5rem;background:white;
+                        border-radius:10px;border:1px solid #e2e8f0;
+                        border-left:3px solid {c_color}">
+              <div style="font-size:0.75rem;font-weight:700;color:#0f172a">{pr['A']}</div>
+              <div style="font-size:0.7rem;color:#94a3b8;margin:1px 0">+ {pr['B']}</div>
+              <div style="font-size:1rem;font-weight:800;color:{c_color}">{c_val:.2f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown('<p class="section-title" style="margin-top:1rem">📌 높은 상관 페어 TOP 5</p>', unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font-size:0.75rem;color:#94a3b8;margin-bottom:0.7rem'>"
+            "중복 보유 시 분산 효과 낮은 조합</div>",
+            unsafe_allow_html=True
+        )
+        for _, pr in pairs_df[pairs_df["Corr"] < 1.0].tail(5).iloc[::-1].iterrows():
+            c_val   = pr["Corr"]
+            c_color = "#dc2626"
+            st.markdown(f"""
+            <div style="padding:0.65rem 0.8rem;margin-bottom:0.5rem;background:white;
+                        border-radius:10px;border:1px solid #e2e8f0;
+                        border-left:3px solid {c_color}">
+              <div style="font-size:0.75rem;font-weight:700;color:#0f172a">{pr['A']}</div>
+              <div style="font-size:0.7rem;color:#94a3b8;margin:1px 0">+ {pr['B']}</div>
+              <div style="font-size:1rem;font-weight:800;color:{c_color}">{c_val:.2f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # ── 섹터 간 평균 상관계수 히트맵 ─────────────
+    st.markdown('<p class="section-title">섹터 간 평균 상관계수</p>', unsafe_allow_html=True)
+
+    sec_corr_data = {}
+    for t1 in tickers:
+        if t1 not in hist_all:
+            continue
+        n1  = name_map[t1]
+        s1  = REITS_CONFIG[t1]["sector"]
+        for t2 in tickers:
+            if t2 not in hist_all or t1 == t2:
+                continue
+            n2 = name_map[t2]
+            s2 = REITS_CONFIG[t2]["sector"]
+            if n1 in corr.index and n2 in corr.columns:
+                sec_corr_data.setdefault((s1, s2), []).append(corr.loc[n1, n2])
+
+    sectors_u = sorted(set(REITS_CONFIG[t]["sector"] for t in tickers))
+    sec_matrix = pd.DataFrame(index=sectors_u, columns=sectors_u, dtype=float)
+    for (s1, s2), vals in sec_corr_data.items():
+        sec_matrix.loc[s1, s2] = round(np.mean(vals), 3)
+    np.fill_diagonal(sec_matrix.values, 1.0)
+
+    fig_sec = go.Figure(go.Heatmap(
+        z=sec_matrix.values.astype(float),
+        x=sec_matrix.columns.tolist(),
+        y=sec_matrix.index.tolist(),
         colorscale=[
-            [0.0,  "#dc2626"],
-            [0.5,  "#f8fafc"],
-            [1.0,  "#2563eb"],
+            [0.0, "#f8fafc"], [0.5, "#93c5fd"], [1.0, "#1d4ed8"]
         ],
-        zmin=-1, zmax=1,
-        text=np.round(corr.values, 2),
+        zmin=0, zmax=1,
+        text=np.round(sec_matrix.values.astype(float), 2),
         texttemplate="%{text}",
-        textfont=dict(size=9),
-        hoverongaps=False,
-        colorbar=dict(title="Corr", thickness=12),
+        textfont=dict(size=11, color="white"),
+        colorbar=dict(thickness=12, title=dict(text="Avg Corr")),
     ))
-    fig7.update_layout(
-        height=500, margin=dict(l=0,r=0,t=10,b=10),
+    fig_sec.update_layout(
+        height=320,
+        margin=dict(l=0, r=0, t=10, b=10),
         paper_bgcolor="white",
-        xaxis=dict(tickfont=dict(size=9.5), tickangle=-35),
-        yaxis=dict(tickfont=dict(size=9.5)),
+        xaxis=dict(tickfont=dict(size=10.5)),
+        yaxis=dict(tickfont=dict(size=10.5), autorange="reversed"),
         font=dict(family="DM Sans"),
     )
-    st.plotly_chart(fig7, use_container_width=True)
+    st.plotly_chart(fig_sec, use_container_width=True)
 
     st.markdown("""
-    <div style="padding:0.9rem 1.2rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:0.78rem;color:#64748b">
-    <b>읽는 법</b> &nbsp;·&nbsp;
-    <span style="color:#2563eb;font-weight:600">파란색 (1.0)</span> = 완전 양의 상관 &nbsp;·&nbsp;
-    <span style="color:#dc2626;font-weight:600">빨간색 (-1.0)</span> = 완전 음의 상관 &nbsp;·&nbsp;
-    상관계수가 낮은 종목 조합이 포트폴리오 분산 효과가 큽니다.
+    <div style="padding:0.9rem 1.2rem;background:#f8fafc;border:1px solid #e2e8f0;
+                border-radius:10px;font-size:0.78rem;color:#64748b;line-height:1.8">
+      <b>읽는 법</b> &nbsp;·&nbsp;
+      <span style="color:#1d4ed8;font-weight:600">짙은 파랑 (1.0)</span> = 완전 양의 상관 &nbsp;·&nbsp;
+      <span style="color:#64748b;font-weight:600">흰색 (0)</span> = 무상관 &nbsp;·&nbsp;
+      섹터 경계선(실선)은 같은 섹터 클러스터를 나타냅니다. &nbsp;·&nbsp;
+      <b>분산 투자</b>: 낮은 상관 페어 조합으로 변동성을 낮추고 위험 조정 수익률을 높일 수 있습니다.
     </div>
     """, unsafe_allow_html=True)
 
