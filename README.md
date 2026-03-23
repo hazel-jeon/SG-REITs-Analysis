@@ -1,4 +1,4 @@
-# 🏙️ SG-REITs Analysis Dashboard
+# SG-REITs Analysis Dashboard
 
 > An end-to-end investment analysis pipeline covering **performance tracking → DCF valuation → Monte Carlo simulation → strategy backtesting** across 15 Singapore-listed REITs.
 
@@ -9,7 +9,7 @@
 
 ---
 
-## 📌 Overview
+## Overview
 
 The Singapore REIT (S-REIT) market is one of the largest in Asia, offering stable dividend income and diversified sector exposure. This project was built to answer four core investment questions:
 
@@ -20,48 +20,48 @@ The Singapore REIT (S-REIT) market is one of the largest in Asia, offering stabl
 
 ---
 
-## ✨ Features
+## Features
 
-### 📈 Tab 1 — Performance
+### Tab 1 — Performance
 - 1Y cumulative return bar chart with sector-based colour coding
 - Risk vs. Return scatter plot
 - Normalised price history comparison with multi-REIT selection
 
-### 💰 Tab 2 — DCF Valuation
+### Tab 2 — DCF Valuation
 - CAPM-based WACC estimation (Risk-free rate 2.5%, Market risk premium 6.0%)
 - Gordon Growth Model + 10-year DCF to derive per-unit intrinsic value
 - Auto colour-coded upside/downside, NAV discount/premium analysis
 
-### 🗺️ Tab 3 — Sector Analysis
+### Tab 3 — Sector Analysis
 - Sector composition donut chart + radar chart (Return / Yield / Sharpe / DCF Upside)
 - Sharpe vs. Yield bubble chart for risk-adjusted return positioning
 - Per-sector REIT detail cards with clickable sub-tabs
 
-### 📊 Tab 4 — Correlation
+### Tab 4 — Correlation
 - Return correlation heatmap sorted by sector with boundary lines
 - Auto-extracted Top 5 low-correlation pairs (best diversification) & Top 5 high-correlation pairs
 - Sector-level average correlation heatmap
 
-### 🎲 Tab 5 — Monte Carlo DCF
+### Tab 5 — Monte Carlo DCF
 - Normal-distribution noise on growth rate, WACC, and perpetual growth → 10,000 simulations
 - Intrinsic value distribution with P10 (Bear) / P50 (Base) / P90 (Bull) scenarios
 - Real-time probability of exceeding current price
 - All parameters adjustable via expander panel
 
-### ⏱️ Tab 6 — Backtesting
+### Tab 6 — Backtesting
 - Trailing DPU calculated from historical dividend records as of Entry Date — no look-ahead bias
 - Equal-weight long-only portfolio for REITs with DCF upside ≥ threshold
 - Alpha measured against STI ETF (CLR.SI) benchmark
 - Cumulative return curve and per-ticker return table
 - Rolling backtest across 2022 / 2023 / 2024 to validate strategy consistency
 
-### 🤖 Automation Pipeline (`main.py`)
+### Automation Pipeline (`main.py`)
 - Data collection → PDF report generation → automated email delivery
 - Scheduled daily via GitHub Actions cron
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```
 SG-REITs-Analysis/
@@ -83,7 +83,7 @@ SG-REITs-Analysis/
 
 ---
 
-## ⚙️ Getting Started
+## Getting Started
 
 ### 1. Clone the repository
 ```bash
@@ -108,7 +108,7 @@ python main.py
 
 ---
 
-## 🔐 Email Automation Setup
+## Email Automation Setup
 
 Generate a Gmail App Password and set the following environment variables.
 
@@ -127,7 +127,7 @@ EMAIL_PASS  →  your-16-char-app-password
 
 ---
 
-## 🤖 GitHub Actions Scheduling
+## GitHub Actions Scheduling
 
 Add `.github/workflows/daily_report.yml` to automatically generate and email the analysis report every morning.
 
@@ -156,7 +156,7 @@ jobs:
 
 ---
 
-## 📐 Methodology
+## Methodology
 
 ### DCF Valuation
 ```
@@ -194,7 +194,7 @@ g_p   ~ N(2.5%, 0.5%)     # Perpetual growth rate
 
 ---
 
-## ⚠️ Limitations & Disclaimers
+## Limitations & Disclaimers
 
 - Transaction costs, slippage, and taxes are not modelled
 - DCF relies on simplified assumptions and may diverge from true intrinsic value
@@ -204,7 +204,7 @@ g_p   ~ N(2.5%, 0.5%)     # Perpetual growth rate
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Category | Libraries |
 |---|---|
@@ -218,7 +218,7 @@ g_p   ~ N(2.5%, 0.5%)     # Perpetual growth rate
 
 ---
 
-## 📊 Coverage Universe (15 S-REITs)
+## Coverage Universe (15 S-REITs)
 
 Selection criteria: market cap ≥ S$500M, stable yfinance data availability, sector & geographic diversification.
 
@@ -242,6 +242,6 @@ Selection criteria: market cap ≥ S$500M, stable yfinance data availability, se
 
 ---
 
-## 📄 License
+## License
 
 MIT License © 2026 [hazel-jeon](https://github.com/hazel-jeon)
