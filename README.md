@@ -242,6 +242,11 @@ Selection criteria: market cap ≥ S$500M, stable yfinance data availability, se
 
 ---
 
+## Interactive Notebook
+Kaggle: [Singapore REIT Investment Analysis] (https://www.kaggle.com/code/hjnjeon/singapore-reit-investment-analysis)
+
+---
+
 ## License
 
 MIT License © 2026 [hazel-jeon](https://github.com/hazel-jeon)
