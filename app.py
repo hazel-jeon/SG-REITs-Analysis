@@ -16,7 +16,7 @@ from ui import tab_performance, tab_dcf, tab_sector, tab_correlation, tab_montec
 # ─────────────────────────────────────────────
 st.set_page_config(
     page_title="SG-REITs Dashboard",
-    page_icon="🏙️",
+    page_icon="SG",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -27,7 +27,7 @@ st.markdown(CSS, unsafe_allow_html=True)
 # Sidebar
 # ─────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## 🏙️ SG-REITs")
+    st.markdown("## SG-REITs")
     st.markdown("---")
 
     all_sectors = sorted({v["sector"] for v in REITS_CONFIG.values()})
@@ -41,7 +41,7 @@ with st.sidebar:
     st.selectbox("Benchmark", ["CLR.SI (STI ETF)", "ES3.SI (STI)"], index=0)
 
     st.markdown("---")
-    if st.button("🔄  Refresh Data", use_container_width=True):
+    if st.button("Refresh Data", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
@@ -54,11 +54,11 @@ with st.sidebar:
 # ─────────────────────────────────────────────
 # Load + filter
 # ─────────────────────────────────────────────
-with st.spinner("📡 Fetching market data..."):
+with st.spinner("Fetching market data..."):
     df_all = load_data()
 
 if df_all.empty or "Sector" not in df_all.columns:
-    st.error("데이터를 불러오지 못했습니다. 네트워크 상태를 확인하거나 잠시 후 🔄 Refresh를 눌러주세요.")
+    st.error("Failed to load data. Please check your network connection or try refreshing later.")
     st.stop()
 
 df = df_all[df_all["Sector"].isin(sel_sectors)].copy()
@@ -68,7 +68,7 @@ if min_sharpe > 0:
     df = df[df["Sharpe"].fillna(-99) >= min_sharpe]
 
 if df.empty:
-    st.warning("선택한 필터 조건에 맞는 REIT가 없습니다. 필터를 조정해 주세요.")
+    st.warning("No REITs match the selected filter criteria. Please adjust your filters.")
     st.stop()
 
 # ─────────────────────────────────────────────
@@ -119,13 +119,13 @@ st.markdown(f"""
 # Tabs
 # ─────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "📈  Performance",
-    "💰  DCF Valuation",
-    "🗺️  Sector Analysis",
-    "📊  Correlation",
-    "🎲  Monte Carlo DCF",
-    "⏱️  Backtesting",
-    "⚖️  Portfolio Optimizer",
+    "Performance",
+    "DCF Valuation",
+    "Sector Analysis",
+    "Correlation",
+    "Monte Carlo DCF",
+    "Backtesting",
+    "Portfolio Optimizer",
 ])
 
 with tab1:
